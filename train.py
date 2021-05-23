@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--neg_epoch", type=int, default=10)
     parser.add_argument("--test_epoch", type=int, default=100)
     parser.add_argument("--reset_epoch", type=int, default=20)
-    parser.add_argument("--stable_test", action="store_true", default=False)
+    parser.add_argument("--stable_test", action="store_true", default=True)
 
     parser.add_argument("--keep_seeds", type=int, default=4500)
     parser.add_argument("--new_train_seeds", type=int, default=8000)
@@ -136,21 +136,21 @@ def generate_pairs(x1, x2, data):
         '''
         全局对齐筛选样例
         '''
-        pair_num = seeds.size(0)
-        index = (S_global.softmax(1) + S_global.softmax(0)).flatten().argsort(descending=True)
-        index_e1 = index // pair_num
-        index_e2 = index % pair_num
-        aligned_e1 = torch.zeros(pair_num, dtype=torch.bool)
-        aligned_e2 = torch.zeros(pair_num, dtype=torch.bool)
-        true_aligned = 0
-        for _ in range(pair_num * 100):
-            if aligned_e1[index_e1[_]] or aligned_e2[index_e2[_]]:
-                continue
-            global_align.append((seeds[index_e1[_].item(),0].item(),seeds[index_e2[_].item(),1].item()))
-            if index_e1[_] == index_e2[_]:
-                true_aligned += 1
-            aligned_e1[index_e1[_]] = True
-            aligned_e2[index_e2[_]] = True       
+#         pair_num = seeds.size(0)
+#         index = (S_global.softmax(1) + S_global.softmax(0)).flatten().argsort(descending=True)
+#         index_e1 = index // pair_num
+#         index_e2 = index % pair_num
+#         aligned_e1 = torch.zeros(pair_num, dtype=torch.bool)
+#         aligned_e2 = torch.zeros(pair_num, dtype=torch.bool)
+#         true_aligned = 0
+#         for _ in range(pair_num * 100):
+#             if aligned_e1[index_e1[_]] or aligned_e2[index_e2[_]]:
+#                 continue
+#             global_align.append((seeds[index_e1[_].item(),0].item(),seeds[index_e2[_].item(),1].item()))
+#             if index_e1[_] == index_e2[_]:
+#                 true_aligned += 1
+#             aligned_e1[index_e1[_]] = True
+#             aligned_e2[index_e2[_]] = True       
 
         '''
         局部对齐筛选样例
@@ -181,8 +181,8 @@ def generate_pairs(x1, x2, data):
                 else:
                     false_idx.append((seeds[i,0].item(), seeds[left_i.item(),1].item()))  
 
-        new_idx = list(set(new_idx).intersection(set(global_align)))
-        false_idx = list(set(false_idx).difference(set(global_align)))
+#         new_idx = list(set(new_idx).intersection(set(global_align)))
+#         false_idx = list(set(false_idx).difference(set(global_align)))
         
         positive =  len(new_idx)
         negative =  len(false_idx)
