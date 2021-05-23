@@ -32,9 +32,9 @@ def parse_args():
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--gamma", type=float, default=3)
 
-    parser.add_argument("--epoch", type=int, default=160)
+    parser.add_argument("--epoch", type=int, default=500)
     parser.add_argument("--neg_epoch", type=int, default=10)
-    parser.add_argument("--test_epoch", type=int, default=40)
+    parser.add_argument("--test_epoch", type=int, default=100)
     parser.add_argument("--reset_epoch", type=int, default=20)
     parser.add_argument("--stable_test", action="store_true", default=False)
 
