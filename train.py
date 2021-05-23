@@ -21,8 +21,8 @@ set_seeds()
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", action="store_true", default=True)
-    parser.add_argument("--model_parallel", action="store_true", default=False)
-    parser.add_argument("--GPU", type=list, nargs='+', default=['0'])
+    parser.add_argument("--model_parallel", action="store_true", default=True)
+    parser.add_argument("--GPU", type=list, nargs='+', default=[['0'],['1']])
     parser.add_argument("--data", default="data")
     parser.add_argument("--lang", default="zh_en")
     parser.add_argument("--rate", type=float, default=0.3)
@@ -38,9 +38,9 @@ def parse_args():
     parser.add_argument("--reset_epoch", type=int, default=20)
     parser.add_argument("--stable_test", action="store_true", default=False)
 
-    parser.add_argument("--keep_seeds", type=int, default=2000)
-    parser.add_argument("--new_train_seeds", type=int, default=7000)
-    parser.add_argument("--neg_seeds", type=int, default=1000)
+    parser.add_argument("--keep_seeds", type=int, default=4500)
+    parser.add_argument("--new_train_seeds", type=int, default=8000)
+    parser.add_argument("--neg_seeds", type=int, default=2000)
     args = parser.parse_args()
     return args
 
