@@ -172,3 +172,230 @@ class EchoEA(nn.Module):
         x_e = torch.cat([x_e, y_e], dim=1)
         
         return x_e.to(self.second_device)
+
+class EchoEA_woPAL(nn.Module):
+    def __init__(self, device, second_device, e_hidden=300, r_hidden=300):
+        super(EchoEA_woPAL, self).__init__()
+        
+        self.device = device
+        self.second_device = second_device
+        '''
+        Primitive Aggregation Layer
+        '''
+#         self.gcn1 = GCN(e_hidden).to(self.second_device)
+#         self.highway1 = Highway(e_hidden).to(self.second_device)
+#         self.gat1 = GAT(e_hidden).to(self.second_device)
+#         self.gathighway1 = Highway(e_hidden).to(self.second_device)
+#         self.gat2 = GAT(e_hidden).to(self.second_device)
+#         self.gathighway2 = Highway(e_hidden).to(self.second_device)
+        
+#         self.gat3 = GAT(e_hidden)
+#         self.gathighway3 = Highway(e_hidden)
+  
+#         self.gcn2 = GCN(e_hidden)
+#         self.highway2 = Highway(e_hidden + 2 * r_hidden)
+ 
+        '''
+        Echo Layer
+        '''
+        self.highway3 = Highway(r_hidden).to(self.device)
+        self.highway4 = Highway(r_hidden).to(self.device)
+        
+        self.gat_e_to_r = GAT_E_to_R(e_hidden, r_hidden).to(self.device)
+        self.gat_r_to_e = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+        self.gat_r_to_e_t = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+        self.gat = GAT(e_hidden + 2 * r_hidden).to(device)
+#         self.gcn_end = GCN(e_hidden + 2 * r_hidden)
+#         self.gat_h = GAT(2 * r_hidden)
+#         self.gat_t = GAT(2 * r_hidden)
+
+        self.dropout = nn.Dropout(0.05)
+
+
+    def forward(self, x_e, edge_index, rel, edge_index_all, rel_all):
+        '''
+        Primitive Aggregation Layer
+        '''
+        x_e = F.normalize(x_e, dim=1, p=2)
+#         x_e_init2 = self.highway1(x_e_init, self.gcn1(self.dropout(x_e_init), edge_index_all))
+#         x_e_init3 = self.gathighway1(x_e_init2, self.gat1(self.dropout(x_e_init2), edge_index_all))
+#         x_e = self.gathighway2(x_e_init2, self.gat2(self.dropout(x_e_init3), edge_index_all))
+
+        x_e = x_e.to(self.device)
+        edge_index = edge_index.clone().to(self.device)
+        rel = rel.clone().to(self.device)
+        edge_index_all = edge_index_all.clone().to(self.device)
+        
+        '''
+        Echo Layer
+        '''
+        x_r_h, x_r_t = self.gat_e_to_r(self.dropout(x_e), edge_index, rel)
+        x_r_h_x_e_h, x_r_h_x_e_t = self.gat_r_to_e(self.dropout(x_e), self.dropout(x_r_h), edge_index, rel)
+        x_r_t_x_e_h, x_r_t_x_e_t = self.gat_r_to_e_t(self.dropout(x_e), self.dropout(x_r_t), edge_index, rel)
+        x_e = torch.cat([
+            x_e, self.highway3(x_r_h_x_e_h, x_r_t_x_e_h), self.highway4(x_r_h_x_e_t, x_r_t_x_e_t),
+        ], dim=1)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+        y_e = self.gat(self.dropout(x_e), edge_index_all)
+        x_e = torch.cat([x_e, y_e], dim=1)
+        
+        return x_e.to(self.second_device)
+    
+    
+class EchoEA_woEL(nn.Module):
+    def __init__(self, device, second_device, e_hidden=300, r_hidden=300):
+        super(EchoEA_woEL, self).__init__()
+        
+        self.device = device
+        self.second_device = second_device
+        '''
+        Primitive Aggregation Layer
+        '''
+        self.gcn1 = GCN(e_hidden).to(self.second_device)
+        self.highway1 = Highway(e_hidden).to(self.second_device)
+        self.gat1 = GAT(e_hidden).to(self.second_device)
+        self.gathighway1 = Highway(e_hidden).to(self.second_device)
+        self.gat2 = GAT(e_hidden).to(self.second_device)
+        self.gathighway2 = Highway(e_hidden).to(self.second_device)
+        
+#         self.gat3 = GAT(e_hidden)
+#         self.gathighway3 = Highway(e_hidden)
+  
+#         self.gcn2 = GCN(e_hidden)
+#         self.highway2 = Highway(e_hidden + 2 * r_hidden)
+ 
+        '''
+        Echo Layer
+        '''
+#         self.highway3 = Highway(r_hidden).to(self.device)
+#         self.highway4 = Highway(r_hidden).to(self.device)
+        
+#         self.gat_e_to_r = GAT_E_to_R(e_hidden, r_hidden).to(self.device)
+#         self.gat_r_to_e = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+#         self.gat_r_to_e_t = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+        self.gat = GAT(e_hidden).to(device)
+#         self.gcn_end = GCN(e_hidden + 2 * r_hidden)
+#         self.gat_h = GAT(2 * r_hidden)
+#         self.gat_t = GAT(2 * r_hidden)
+
+        self.dropout = nn.Dropout(0.05)
+
+
+    def forward(self, x_e, edge_index, rel, edge_index_all, rel_all):
+        '''
+        Primitive Aggregation Layer
+        '''
+        x_e_init = F.normalize(x_e, dim=1, p=2)
+        x_e_init2 = self.highway1(x_e_init, self.gcn1(self.dropout(x_e_init), edge_index_all))
+        x_e_init3 = self.gathighway1(x_e_init2, self.gat1(self.dropout(x_e_init2), edge_index_all))
+        x_e = self.gathighway2(x_e_init2, self.gat2(self.dropout(x_e_init3), edge_index_all))
+
+        x_e = x_e.to(self.device)
+        edge_index = edge_index.clone().to(self.device)
+        rel = rel.clone().to(self.device)
+        edge_index_all = edge_index_all.clone().to(self.device)
+        
+        '''
+        Echo Layer
+        '''
+#         x_r_h, x_r_t = self.gat_e_to_r(self.dropout(x_e), edge_index, rel)
+#         x_r_h_x_e_h, x_r_h_x_e_t = self.gat_r_to_e(self.dropout(x_e), self.dropout(x_r_h), edge_index, rel)
+#         x_r_t_x_e_h, x_r_t_x_e_t = self.gat_r_to_e_t(self.dropout(x_e), self.dropout(x_r_t), edge_index, rel)
+#         x_e = torch.cat([
+#             x_e, self.highway3(x_r_h_x_e_h, x_r_t_x_e_h), self.highway4(x_r_h_x_e_t, x_r_t_x_e_t),
+#         ], dim=1)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+        y_e = self.gat(self.dropout(x_e), edge_index_all)
+        x_e = torch.cat([x_e, y_e], dim=1)
+        
+        return x_e.to(self.second_device)
+    
+    
+class EchoEA_woCAL(nn.Module):
+    def __init__(self, device, second_device, e_hidden=300, r_hidden=300):
+        super(EchoEA_woCAL, self).__init__()
+        
+        self.device = device
+        self.second_device = second_device
+        '''
+        Primitive Aggregation Layer
+        '''
+        self.gcn1 = GCN(e_hidden).to(self.second_device)
+        self.highway1 = Highway(e_hidden).to(self.second_device)
+        self.gat1 = GAT(e_hidden).to(self.second_device)
+        self.gathighway1 = Highway(e_hidden).to(self.second_device)
+        self.gat2 = GAT(e_hidden).to(self.second_device)
+        self.gathighway2 = Highway(e_hidden).to(self.second_device)
+        
+#         self.gat3 = GAT(e_hidden)
+#         self.gathighway3 = Highway(e_hidden)
+  
+#         self.gcn2 = GCN(e_hidden)
+#         self.highway2 = Highway(e_hidden + 2 * r_hidden)
+ 
+        '''
+        Echo Layer
+        '''
+        self.highway3 = Highway(r_hidden).to(self.device)
+        self.highway4 = Highway(r_hidden).to(self.device)
+        
+        self.gat_e_to_r = GAT_E_to_R(e_hidden, r_hidden).to(self.device)
+        self.gat_r_to_e = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+        self.gat_r_to_e_t = GAT_R_to_E(e_hidden, r_hidden).to(self.device)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+#         self.gat = GAT(e_hidden + 2 * r_hidden).to(device)
+#         self.gcn_end = GCN(e_hidden + 2 * r_hidden)
+#         self.gat_h = GAT(2 * r_hidden)
+#         self.gat_t = GAT(2 * r_hidden)
+
+        self.dropout = nn.Dropout(0.05)
+
+
+    def forward(self, x_e, edge_index, rel, edge_index_all, rel_all):
+        '''
+        Primitive Aggregation Layer
+        '''
+        x_e_init = F.normalize(x_e, dim=1, p=2)
+        x_e_init2 = self.highway1(x_e_init, self.gcn1(self.dropout(x_e_init), edge_index_all))
+        x_e_init3 = self.gathighway1(x_e_init2, self.gat1(self.dropout(x_e_init2), edge_index_all))
+        x_e = self.gathighway2(x_e_init2, self.gat2(self.dropout(x_e_init3), edge_index_all))
+
+        x_e = x_e.to(self.device)
+        edge_index = edge_index.clone().to(self.device)
+        rel = rel.clone().to(self.device)
+        edge_index_all = edge_index_all.clone().to(self.device)
+        
+        '''
+        Echo Layer
+        '''
+        x_r_h, x_r_t = self.gat_e_to_r(self.dropout(x_e), edge_index, rel)
+        x_r_h_x_e_h, x_r_h_x_e_t = self.gat_r_to_e(self.dropout(x_e), self.dropout(x_r_h), edge_index, rel)
+        x_r_t_x_e_h, x_r_t_x_e_t = self.gat_r_to_e_t(self.dropout(x_e), self.dropout(x_r_t), edge_index, rel)
+        x_e = torch.cat([
+            x_e, self.highway3(x_r_h_x_e_h, x_r_t_x_e_h), self.highway4(x_r_h_x_e_t, x_r_t_x_e_t),
+        ], dim=1)
+        
+        '''
+        Complete Aggregation Layer
+        '''
+#         y_e = self.gat(self.dropout(x_e), edge_index_all)
+#         x_e = torch.cat([x_e, y_e], dim=1)
+        
+        return x_e.to(self.second_device)
