@@ -16,7 +16,7 @@ from toolbox.DataSchema import cache_data, read_cache
 from pathlib import Path
 from loss import L1_Loss
 
-set_seeds()
+set_seeds(2222)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -46,7 +46,6 @@ def parse_args():
 
 
 args = parse_args()
-# 程序在主device上显存消耗大
 if args.model_parallel == True:
     device = 'cuda:'+args.GPU[0][0]
     second_device = 'cuda:'+args.GPU[1][0]
@@ -55,7 +54,7 @@ else:
     device = 'cuda:'+args.GPU[0][0]
     second_device = 'cuda:'+args.GPU[0][0]
     
-# 读取属性信息
+# load attribute similarity and value similarity
 root=Path("data/%s/cache"%args.lang)
 pairs = load_alignment_pair("data/%s/ref_ent_ids"%args.lang)
 ratio=0.3
@@ -63,8 +62,8 @@ test_pair = pairs[int(ratio * len(pairs)):]
 
 test_seeds = torch.LongTensor(test_pair).to(second_device)
 
-S1 = read_cache(root / "attr_similarity").to(second_device)  # 属性相似度（集合相似度）
-S2 = read_cache(root / "value_similarity").to(second_device)  # 属性值相似度（集合相似度）
+S1 = read_cache(root / "attr_similarity").to(second_device)
+S2 = read_cache(root / "value_similarity").to(second_device)
     
     
 def get_emb(model, data):
@@ -94,7 +93,6 @@ def train(model, criterion, optimizer, data, train_batch, false_pair=None):
 
 
 def init_data(args, device):
-    # args.data数据集根目录,args.lang采用的数据集
     data = DBP15K(args.data, args.lang, rate=args.rate)[0]
     data.x1 = F.normalize(data.x1, dim=1, p=2).to(device).requires_grad_()
     data.x2 = F.normalize(data.x2, dim=1, p=2).to(device).requires_grad_()
@@ -105,8 +103,6 @@ def init_data(args, device):
 
 def test(x1, x2, data, stable=False):
     with torch.no_grad():
-#         print('-' * 16 + 'Train_set' + '-' * 16)
-#         get_hits(x1, x2, data.train_set)
         print('-' * 16 + 'Train_set' + '-' * 16)
         get_hits(x1, x2, data.new_train_set)
         print('-' * 16 + 'Test_set' + '-' * 17)
@@ -125,17 +121,11 @@ def generate_pairs(x1, x2, data):
         false_idx = []
         global_align = []
         
-        '''
-        前compose生成样例
-        '''
         S = torch.cdist(x1[seeds[:, 0]], x2[seeds[:, 1]], p=1)
         S = S.to(second_device)
-        S = composeS([S1, S2, S], [0.8, 0.6, 0.1])
+        S = composeS([S1, S2, S], [0.5, 0.4, 0.1])
         S_global = -S
         
-        '''
-        全局对齐筛选样例
-        '''
         pair_num = seeds.size(0)
         index = (S_global.softmax(1) + S_global.softmax(0)).flatten().argsort(descending=True)
         index_e1 = index // pair_num
@@ -152,14 +142,8 @@ def generate_pairs(x1, x2, data):
             aligned_e1[index_e1[_]] = True
             aligned_e2[index_e2[_]] = True       
 
-        '''
-        局部对齐筛选样例
-        '''
         left_pred = S.topk(1, largest=False)[1]
         right_pred = S.T.topk(1, largest=False)[1]
-           
-        # left_pred 左到右距离
-        # right_pred 右到左距离
         
         positive = 0
         negative = 0
@@ -223,22 +207,16 @@ def reset(x1, x2, data, keep_seeds=2000, new_train_seeds=7000, neg_seeds=1000):
         new_test_false_set = new_test_false_set[idx].to(second_device)
         return new_test_false_set
 
-    
-
 if __name__=='__main__':
 
     data = init_data(args, second_device).to(second_device)
-#     消融名称
-#     ablation = "_precompose_globalpair"
 
     model = EchoEA(device, second_device, data.x1.size(1), args.r_hidden)
     optimizer = torch.optim.Adam(itertools.chain(model.parameters(), iter([data.x1, data.x2])))
-#     model, optimizer = apex.amp.initialize(model, optimizer)
     criterion = L1_Loss(args.gamma)
     data.new_train_set = data.train_set
     false_pair = None
 
-#     使用测试集hits1寻找最优
 #     max_hits1 = 0
 #     save_epoch = 200
 
@@ -251,17 +229,18 @@ if __name__=='__main__':
         if (epoch + 1) % args.test_epoch == 0:
             print()
             S, hits1 = test(x1, x2, data, args.stable_test)
+            
+            # save model and embedding
+            
 #             if(hits1 >= max_hits1 and epoch + 2 > save_epoch):
 #                 max_hits1 = hits1     
-#                 # 保存相似度矩阵
 #                 cache_dir = Path("data/%s/cache/" % args.lang)
 #                 cache_dir.mkdir(exist_ok=True)
-#                 cache_data(S, cache_dir / ("rel_graph_similarity_e" + str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+ablation))
+#                 cache_data(S, cache_dir / ("rel_graph_similarity_e" + str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))))
 #                 del S
 
-#                 # 保存实体表示和模型参数
-#                 torch.save([data.x1.clone().to('cpu'),data.x2.clone().to('cpu')], ("saved_models/"+ args.lang + "_emb_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+ablation+".pt"))
-#                 torch.save(model.state_dict(),("saved_models/"+ args.lang + "_model_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+ablation+".pt"))
+#                 torch.save([data.x1.clone().to('cpu'),data.x2.clone().to('cpu')], ("saved_models/"+ args.lang + "_emb_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+".pt"))
+#                 torch.save(model.state_dict(),("saved_models/"+ args.lang + "_model_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+".pt"))
 
         if (epoch + 1) % args.reset_epoch == 0:
             false_pair = reset(x1, x2, data, \

@@ -36,7 +36,7 @@ class DBP15K(InMemoryDataset):
 
         pair_path = os.path.join(self.root, self.pair, 'ref_ent_ids')
         pair_set = self.process_pair(pair_path, assoc1, assoc2)
-        pair_set = pair_set[:, torch.randperm(pair_set.size(1))]
+#         pair_set = pair_set[:, torch.randperm(pair_set.size(1))]
         train_set = pair_set[:, :int(self.rate * pair_set.size(1))]
         test_set = pair_set[:, int(self.rate * pair_set.size(1)):]
 

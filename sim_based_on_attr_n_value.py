@@ -9,36 +9,6 @@ from toolbox.DataSchema import cache_data
 from toolbox.Progbar import Progbar
 from utils import load_alignment_pair
 
-"""
-computing attr and value similarity for zh_en
-10500/10500 [===============] - 871s - node: 22519
-zh_en
-属性相似度
-Left:   Hits@1: 13.34%    Hits@5: 23.98%    Hits@10: 30.27%    MRR: 0.190
-Right:  Hits@1: 14.78%    Hits@5: 25.20%    Hits@10: 30.68%    MRR: 0.202
-属性值相似度
-Left:   Hits@1: 41.95%    Hits@5: 58.00%    Hits@10: 63.97%    MRR: 0.498
-Right:  Hits@1: 29.13%    Hits@5: 48.42%    Hits@10: 56.23%    MRR: 0.385
-computing attr and value similarity for fr_en
-10500/10500 [===============] - 885s - node: 24620
-fr_en
-属性相似度
-Left:   Hits@1: 0.79%    Hits@5: 3.10%    Hits@10: 5.08%    MRR: 0.025
-Right:  Hits@1: 1.00%    Hits@5: 3.18%    Hits@10: 5.29%    MRR: 0.027
-属性值相似度
-Left:   Hits@1: 63.93%    Hits@5: 76.55%    Hits@10: 79.48%    MRR: 0.698
-Right:  Hits@1: 60.57%    Hits@5: 76.53%    Hits@10: 80.33%    MRR: 0.674
-computing attr and value similarity for ja_en
-10500/10500 [===============] - 841s - node: 24434
-ja_en
-属性相似度
-Left:   Hits@1: 5.30%    Hits@5: 11.27%    Hits@10: 15.68%    MRR: 0.088
-Right:  Hits@1: 5.82%    Hits@5: 11.50%    Hits@10: 15.26%    MRR: 0.092
-属性值相似度
-Left:   Hits@1: 34.16%    Hits@5: 48.40%    Hits@10: 54.70%    MRR: 0.413
-Right:  Hits@1: 33.62%    Hits@5: 47.92%    Hits@10: 53.62%    MRR: 0.405
-"""
-
 
 def get_attr_name2id_dict(path):
     att_dict = {}
@@ -151,9 +121,9 @@ if __name__ == '__main__':
         attr_similarity = -torch.Tensor(attr_similarity)
         value_similarity = -torch.Tensor(value_similarity)
         print(i)
-        print("属性相似度")
+        print("attribute similarity")
         get_hits_from_S(attr_similarity, torch.LongTensor(test_pair))
-        print("属性值相似度")
+        print("attribute similarity")
         get_hits_from_S(value_similarity, torch.LongTensor(test_pair))
         cache_dir = Path("data/%s/cache/" % i)
         cache_dir.mkdir(exist_ok=True)

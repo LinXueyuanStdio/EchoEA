@@ -130,7 +130,7 @@ def generate_pairs(x1, x2, data):
         '''
         S = torch.cdist(x1[seeds[:, 0]], x2[seeds[:, 1]], p=1)
         S = S.to(second_device)
-        S = composeS([S1, S2, S], [0.8, 0.6, 0.1])
+        S = composeS([S1, S2, S], [0.5, 0.4, 0.1])
         S_global = -S
         
         '''
