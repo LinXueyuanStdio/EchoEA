@@ -2,6 +2,8 @@
 
 code for **"EchoEA: Echo Information between Entities and Relations for Entity Alignment"**
 
+![EchoEA Framework](./assets/echoframework.jpg)
+
 ## Environment
 
 - PyTorch 1.8.1 + cuda 10.2
@@ -18,7 +20,7 @@ pip install torch-geometric
 
 ## How to Run
 
-Prepare attribute similarity and value similarity:
+To prepare attribute similarity and value similarity:
 ```shell
 python sim_based_on_attr_n_value.py
 ```
