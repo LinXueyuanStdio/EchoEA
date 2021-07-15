@@ -1,28 +1,22 @@
 import argparse
-
 import itertools
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.utils import softmax, degree
-from torch_sparse import spmm
-from utils import composeS, add_inverse_rels, get_hits, get_hits_stable, get_hits_from_S, load_alignment_pair
+from pathlib import Path
 
 from data import DBP15K
-from model import *
-
-from toolbox.RandomSeeds import set_seeds
-from toolbox.DataSchema import cache_data, read_cache
-from pathlib import Path
 from loss import L1_Loss
+from model import *
+from toolbox.DataSchema import read_cache
+from toolbox.RandomSeeds import set_seeds
+from utils import composeS, add_inverse_rels, get_hits, get_hits_stable, load_alignment_pair
 
 set_seeds()
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", action="store_true", default=True)
     parser.add_argument("--model_parallel", action="store_true", default=True)
-    parser.add_argument("--GPU", type=list, nargs='+', default=[['0'],['1']])
+    parser.add_argument("--GPU", type=list, nargs='+', default=[['0'], ['1']])
     parser.add_argument("--data", default="data")
     parser.add_argument("--lang", default="zh_en")
     parser.add_argument("--rate", type=float, default=0.3)
@@ -48,31 +42,32 @@ def parse_args():
 args = parse_args()
 # 程序在主device上显存消耗大
 if args.model_parallel == True:
-    device = 'cuda:'+args.GPU[0][0]
-    second_device = 'cuda:'+args.GPU[1][0]
-    
+    device = 'cuda:' + args.GPU[0][0]
+    second_device = 'cuda:' + args.GPU[1][0]
+
 else:
-    device = 'cuda:'+args.GPU[0][0]
-    second_device = 'cuda:'+args.GPU[0][0]
-    
+    device = 'cuda:' + args.GPU[0][0]
+    second_device = 'cuda:' + args.GPU[0][0]
+
 # 读取属性信息
-root=Path("data/%s/cache"%args.lang)
-pairs = load_alignment_pair("data/%s/ref_ent_ids"%args.lang)
-ratio=0.3
+root = Path("data/%s/cache" % args.lang)
+pairs = load_alignment_pair("data/%s/ref_ent_ids" % args.lang)
+ratio = 0.3
 test_pair = pairs[int(ratio * len(pairs)):]
 
 test_seeds = torch.LongTensor(test_pair).to(second_device)
 
 S1 = read_cache(root / "attr_similarity").to(second_device)  # 属性相似度（集合相似度）
 S2 = read_cache(root / "value_similarity").to(second_device)  # 属性值相似度（集合相似度）
-    
-    
+
+
 def get_emb(model, data):
     model.eval()
     with torch.no_grad():
         x1 = model(data.x1, data.edge_index1, data.rel1, data.edge_index_all1, data.rel_all1)
         x2 = model(data.x2, data.edge_index2, data.rel2, data.edge_index_all2, data.rel_all2)
     return x1, x2
+
 
 def get_train_batch(x1, x2, train_set, k=5):
     e1_neg1 = torch.cdist(x1[train_set[:, 0]], x1, p=1).topk(k + 1, largest=False)[1].t()[1:]
@@ -81,6 +76,7 @@ def get_train_batch(x1, x2, train_set, k=5):
     e2_neg2 = torch.cdist(x2[train_set[:, 1]], x1, p=1).topk(k + 1, largest=False)[1].t()[1:]
     train_batch = torch.stack([e1_neg1, e1_neg2, e2_neg1, e2_neg2], dim=0)
     return train_batch
+
 
 def train(model, criterion, optimizer, data, train_batch, false_pair=None):
     model.train()
@@ -105,8 +101,8 @@ def init_data(args, device):
 
 def test(x1, x2, data, stable=False):
     with torch.no_grad():
-#         print('-' * 16 + 'Train_set' + '-' * 16)
-#         get_hits(x1, x2, data.train_set)
+        #         print('-' * 16 + 'Train_set' + '-' * 16)
+        #         get_hits(x1, x2, data.train_set)
         print('-' * 16 + 'Train_set' + '-' * 16)
         get_hits(x1, x2, data.new_train_set)
         print('-' * 16 + 'Test_set' + '-' * 17)
@@ -124,7 +120,7 @@ def generate_pairs(x1, x2, data):
         new_idx = []
         false_idx = []
         global_align = []
-        
+
         '''
         前compose生成样例
         '''
@@ -132,7 +128,7 @@ def generate_pairs(x1, x2, data):
         S = S.to(second_device)
         S = composeS([S1, S2, S], [0.5, 0.4, 0.1])
         S_global = -S
-        
+
         '''
         全局对齐筛选样例
         '''
@@ -146,21 +142,21 @@ def generate_pairs(x1, x2, data):
         for _ in range(pair_num * 100):
             if aligned_e1[index_e1[_]] or aligned_e2[index_e2[_]]:
                 continue
-            global_align.append((seeds[index_e1[_].item(),0].item(),seeds[index_e2[_].item(),1].item()))
+            global_align.append((seeds[index_e1[_].item(), 0].item(), seeds[index_e2[_].item(), 1].item()))
             if index_e1[_] == index_e2[_]:
                 true_aligned += 1
             aligned_e1[index_e1[_]] = True
-            aligned_e2[index_e2[_]] = True       
+            aligned_e2[index_e2[_]] = True
 
         '''
         局部对齐筛选样例
         '''
         left_pred = S.topk(1, largest=False)[1]
         right_pred = S.T.topk(1, largest=False)[1]
-           
+
         # left_pred 左到右距离
         # right_pred 右到左距离
-        
+
         positive = 0
         negative = 0
         false_positive = 0
@@ -170,38 +166,39 @@ def generate_pairs(x1, x2, data):
             left_i = left_pred[i]
             j = right_pred[left_i]
             if i == j.item():
-                new_idx.append((seeds[i,0].item(), seeds[left_i.item(),1].item()))
+                new_idx.append((seeds[i, 0].item(), seeds[left_i.item(), 1].item()))
             else:
                 negative += 1
-                l2r_dist = S[i,left_i]
-                r2l_dist = S.T[left_i,j]
-                
-                if(l2r_dist > r2l_dist):
-                    false_idx.append((seeds[i,0].item(), seeds[left_i.item(),1].item()))
+                l2r_dist = S[i, left_i]
+                r2l_dist = S.T[left_i, j]
+
+                if (l2r_dist > r2l_dist):
+                    false_idx.append((seeds[i, 0].item(), seeds[left_i.item(), 1].item()))
                 else:
-                    false_idx.append((seeds[i,0].item(), seeds[left_i.item(),1].item()))  
+                    false_idx.append((seeds[i, 0].item(), seeds[left_i.item(), 1].item()))
 
         new_idx = list(set(new_idx).intersection(set(global_align)))
         false_idx = list(set(false_idx).difference(set(global_align)))
-        
-        positive =  len(new_idx)
-        negative =  len(false_idx)
+
+        positive = len(new_idx)
+        negative = len(false_idx)
 
         false_positive = 0
         false_negative = 0
         for p in new_idx:
-            if(p[0]!=p[1]):
-                false_positive+=1
+            if (p[0] != p[1]):
+                false_positive += 1
         for f in false_idx:
-            if(f[0]==f[1]):
-                false_negative+=1
-        
-        print()
-        print("positive:",positive,"negative:",negative,"false_positive:",false_positive,"false_negative",false_negative)
-        print("false_positive_rate:",false_positive/positive)
-        print("false_negative_rate:",false_negative/negative)
+            if (f[0] == f[1]):
+                false_negative += 1
 
-        return new_idx,false_idx
+        print()
+        print("positive:", positive, "negative:", negative, "false_positive:", false_positive, "false_negative", false_negative)
+        print("false_positive_rate:", false_positive / positive)
+        print("false_negative_rate:", false_negative / negative)
+
+        return new_idx, false_idx
+
 
 def reset(x1, x2, data, keep_seeds=2000, new_train_seeds=7000, neg_seeds=1000):
     with torch.no_grad():
@@ -221,27 +218,26 @@ def reset(x1, x2, data, keep_seeds=2000, new_train_seeds=7000, neg_seeds=1000):
         perm = torch.randperm(new_test_false_set.size(0))
         idx = perm[:neg_seeds]
         new_test_false_set = new_test_false_set[idx].to(second_device)
-#         return new_test_false_set
+        #         return new_test_false_set
         return None
 
-    
 
-if __name__=='__main__':
+if __name__ == '__main__':
 
     data = init_data(args, second_device).to(second_device)
-#     消融名称
-#     ablation = "_precompose_globalpair"
+    #     消融名称
+    #     ablation = "_precompose_globalpair"
 
     model = EchoEA(device, second_device, data.x1.size(1), args.r_hidden)
     optimizer = torch.optim.Adam(itertools.chain(model.parameters(), iter([data.x1, data.x2])))
-#     model, optimizer = apex.amp.initialize(model, optimizer)
+    #     model, optimizer = apex.amp.initialize(model, optimizer)
     criterion = L1_Loss(args.gamma)
     data.new_train_set = data.train_set
     false_pair = None
 
-#     使用测试集hits1寻找最优
-#     max_hits1 = 0
-#     save_epoch = 200
+    #     使用测试集hits1寻找最优
+    #     max_hits1 = 0
+    #     save_epoch = 200
 
     for epoch in range(args.epoch):
         if epoch % args.neg_epoch == 0:
@@ -263,7 +259,6 @@ if __name__=='__main__':
 #                 # 保存实体表示和模型参数
 #                 torch.save([data.x1.clone().to('cpu'),data.x2.clone().to('cpu')], ("saved_models/"+ args.lang + "_emb_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+ablation+".pt"))
 #                 torch.save(model.state_dict(),("saved_models/"+ args.lang + "_model_e"+  str(epoch+1) + "_n" + str(args.neg_epoch) + "_r" + str(args.reset_epoch)+"_hit"+str(int(hits1//1e-4))+ablation+".pt"))
-
 
 
 #         if (epoch + 1) % args.reset_epoch == 0:

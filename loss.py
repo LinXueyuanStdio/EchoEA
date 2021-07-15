@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class L1_Loss(nn.Module):
     def __init__(self, gamma=3):
         super(L1_Loss, self).__init__()

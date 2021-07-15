@@ -4,10 +4,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from RAGAutils import get_hits_from_S
 from toolbox.DataSchema import cache_data
 from toolbox.Progbar import Progbar
-from utils import load_alignment_pair
+from utils import load_alignment_pair, get_hits_from_S
 
 
 def get_attr_name2id_dict(path):
