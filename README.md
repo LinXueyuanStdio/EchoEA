@@ -2,7 +2,8 @@
 
 code for **"EchoEA: Echo Information between Entities and Relations for Entity Alignment"**
 
-![EchoEA Framework](./assets/echoframework.jpg)
+![EchoEA Framework](./assets/EchoEA.png)
+![EchoEA Framework](./assets/EchoModel.png)
 
 ## Environment
 
